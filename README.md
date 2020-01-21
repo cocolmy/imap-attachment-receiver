@@ -1,2 +1,2 @@
-# pop3-attachment-receiver
-POP3 client to pull file attachments from e-mail
+# imap-attachment-receiver
+IMAP client to pull file attachments from server
