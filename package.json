@@ -1,0 +1,28 @@
+{
+  "name": "imap-attachment-receiver",
+  "version": "1.0.0",
+  "description": "Pull down attachmentNone",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lham-ss/imap-attachment-receiver.git"
+  },
+  "keywords": [
+    "imap",
+    "attachments"
+  ],
+  "author": "Lawrence Ham",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/lham-ss/imap-attachment-receiver/issues"
+  },
+  "homepage": "https://github.com/lham-ss/imap-attachment-receiver#readme",
+  "dependencies": {
+    "base64-stream": "^1.0.0",
+    "dotenv": "^8.2.0",
+    "imap": "^0.8.19"
+  }
+}
