@@ -150,7 +150,7 @@ function openInbox() {
     return new Promise((resolve, reject) => {
         imap.openBox('INBOX', false, function(err, box) {
             if (err) reject(err);
-            else resolve(box.messages.total < 1)         
+            else resolve(box.messages.total > 0)         
         });        
     });
 }
