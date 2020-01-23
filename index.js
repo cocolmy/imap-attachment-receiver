@@ -32,9 +32,12 @@ function findAttachmentParts(struct, attachments) {
     return attachments;
 }
 
-function buildAttMessageFunction(attachment) {
-    let filename = attachment.params.name;
+const targetDirectory = './incoming/';
+
+function buildAttMessageFunction(attachment, uid) {
+    let filename = targetDirectory + attachment.params.name;
     let encoding = attachment.encoding;
+    let msgUid = uid;
 
     return function (msg, seqno) {
         let prefix = '(#' + seqno + ') ';
@@ -63,16 +66,20 @@ function buildAttMessageFunction(attachment) {
 
         msg.once('end', function() {
             console.log(prefix + 'Finished attachment %s', filename);
+
+            imap.setFlags(msgUid, '\\Deleted', () => {
+                console.log(`Email ${msgUid} has been marked for deletion.`);
+            });
+
         });
     };
 }
 
-imap.once('ready', function main() {
-
+function processInbox() {
     imap.openBox('INBOX', false, function(err, box) {
         if (err) throw err;
 
-        let f = imap.seq.fetch('1:3', {
+        let f = imap.seq.fetch('1:' + box.messages.total, {
             bodies: ['HEADER.FIELDS (FROM TO SUBJECT DATE)'],
             struct: true
         });
@@ -116,28 +123,16 @@ imap.once('ready', function main() {
                         struct: true
                     });
 
-                    //build function to process attachment message
 
-                    f.on('message', buildAttMessageFunction(attachment));
+                    //build function to process attachment message
+                    //imap.setFlags(attrs.uid, '\\Deleted', () => {});
+
+                    f.on('message', buildAttMessageFunction(attachment, attrs.uid));
                 }
             });
 
             msg.once('end', function() {
                 console.log(prefix + 'Finished email...');
-
-                imap.seq.addFlags(seqno, '\\Deleted', function(err) {
-
-                    if( !err ) {
-                        console.log(`Seq: ${seqno} has been set for deletion.`);
-
-                        imap.expunge((e) => {
-                            if( !e ) console.log(`Seq: ${seqno} has been expunged.`)
-                            else console.trace(err);                
-                        })        
-                    }
-                    else console.trace(err);
-                    
-                });               
             });
 
         });
@@ -153,14 +148,42 @@ imap.once('ready', function main() {
         });
 
     });
+}
+
+function openInbox() {
+    return new Promise((resolve, reject) => {
+        imap.openBox('INBOX', false, function(err, box) {
+            if (err) reject(err);
+            else resolve(box.messages.total < 1)         
+        });        
+    });
+}
+
+imap.once('ready', async function() {
+    await openInbox()
+    .then((msgsWaiting) => {
+        if( msgsWaiting ) {
+            imap.closeBox(true, (err) => { // closeBox(true) to ensure any deleted messages are purged.
+                if( err ) console.log(err);
+                processInbox(); // processInbox opens 'INBOX' as well
+            })    
+        }
+        else imap.end();
+    })
+    .catch((err) => {
+        if( err ) console.log(err);
+        processInbox();
+    });
+
 });
 
 imap.once('error', function(err) {
-  console.log(err);
+    console.log('IMAP ERROR: ')
+    console.log(err);
 });
 
 imap.once('end', function() {
-  console.log('Connection ended');
+    console.log('Connection ended');
 });
 
 imap.connect();
