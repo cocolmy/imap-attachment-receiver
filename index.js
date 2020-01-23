@@ -13,8 +13,7 @@ let imap = new Imap({
     //debug: function(msg) { console.log('imap-debug:', msg) },
 })
 
-
-let toUpper = (thing) => { return thing && thing.toUpperCase ? thing.toUpperCase() : thing }
+let toUpper = (str) => { return str && str.toUpperCase ? str.toUpperCase() : str }
 
 function findAttachmentParts(struct, attachments) {
     attachments = attachments ||  [];
@@ -35,9 +34,12 @@ function findAttachmentParts(struct, attachments) {
 const targetDirectory = './incoming/';
 
 function buildAttMessageFunction(attachment, uid) {
-    let filename = targetDirectory + attachment.params.name;
+    let filename = attachment.params.name;
     let encoding = attachment.encoding;
     let msgUid = uid;
+
+    if( filename ) filename = targetDirectory + filename;
+    else return function() { /* do nothing */ }
 
     return function (msg, seqno) {
         let prefix = '(#' + seqno + ') ';
@@ -50,18 +52,16 @@ function buildAttMessageFunction(attachment, uid) {
 
             writeStream.on('finish', function() {
                 console.log(prefix + 'Done writing to file %s', filename);
+            });
+
+            if (toUpper(encoding) === 'BASE64') {
+                //the stream is base64 encoded, so here the stream is decode on the fly and piped to the write stream (file)
+                stream.pipe(new base64.Base64Decode()).pipe(writeStream);
+            } 
+            else {
+                //here we have none or some other decoding streamed directly to the file which renders it useless probably
+                stream.pipe(writeStream);
             }
-        );
-
-        //stream.pipe(writeStream); this would write base64 data to the file, so we decode during streaming using:
-
-        if (toUpper(encoding) === 'BASE64') {
-            //the stream is base64 encoded, so here the stream is decode on the fly and piped to the write stream (file)
-            stream.pipe(new base64.Base64Decode()).pipe(writeStream);
-        } else  {
-            //here we have none or some other decoding streamed directly to the file which renders it useless probably
-            stream.pipe(writeStream);
-        }
         });
 
         msg.once('end', function() {
@@ -70,7 +70,6 @@ function buildAttMessageFunction(attachment, uid) {
             imap.setFlags(msgUid, '\\Deleted', () => {
                 console.log(`Email ${msgUid} has been marked for deletion.`);
             });
-
         });
     };
 }
@@ -123,10 +122,7 @@ function processInbox() {
                         struct: true
                     });
 
-
                     //build function to process attachment message
-                    //imap.setFlags(attrs.uid, '\\Deleted', () => {});
-
                     f.on('message', buildAttMessageFunction(attachment, attrs.uid));
                 }
             });
@@ -161,20 +157,19 @@ function openInbox() {
 
 imap.once('ready', async function() {
     await openInbox()
-    .then((msgsWaiting) => {
-        if( msgsWaiting ) {
-            imap.closeBox(true, (err) => { // closeBox(true) to ensure any deleted messages are purged.
-                if( err ) console.log(err);
-                processInbox(); // processInbox opens 'INBOX' as well
-            })    
-        }
-        else imap.end();
-    })
-    .catch((err) => {
-        if( err ) console.log(err);
-        processInbox();
-    });
-
+        .then((msgsWaiting) => {
+            if( msgsWaiting ) {
+                imap.closeBox(true, (err) => { // closeBox(true) to ensure any deleted messages are purged.
+                    if( err ) console.log(err);
+                    processInbox(); // processInbox opens 'INBOX' as well
+                })    
+            }
+            else imap.end();
+        })
+        .catch((err) => {
+            if( err ) console.log(err);
+            processInbox();
+        });
 });
 
 imap.once('error', function(err) {
